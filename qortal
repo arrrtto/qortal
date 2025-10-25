@@ -225,7 +225,7 @@ cd $QORTAL_FOLDER
 totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
 if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
 
-QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
+#QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
 
 loop="True"
 while [[ $loop == "True" ]]; do
@@ -235,7 +235,7 @@ connections=$(echo $output | jq '."numberOfConnections"')
 blockheight=$(echo $output | jq '."height"')
 minting=$(echo $output | jq '."isMintingPossible"')
 syncing=$(echo $output | jq '."isSynchronizing"')
-balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
+#balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
 if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
 echo "Restarting the Core..."
 ./stop.sh
@@ -249,7 +249,7 @@ echo "Connections:" $connections
 echo "Syncing:" $syncing
 echo "Minting:" $minting
 echo "Block height:" $blockheight
-echo "Balance:" $balance
+#echo "Balance:" $balance
 sleep 10
 fi
 done
