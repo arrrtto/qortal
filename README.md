@@ -3,4 +3,4 @@ Qortal Helper script for GNU/Linux users (Debian, Ubuntu, Mint and other Debian-
 
 For installing, open Terminal and run this:
 
-curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal > ~/bin/qortal && chmod +x ~/bin/qortal
+mkdir -p ~/bin && curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal > ~/bin/qortal && chmod +x ~/bin/qortal
