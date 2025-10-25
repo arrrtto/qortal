@@ -48,8 +48,7 @@ echo "Done."
 echo ""
 fi
 
-mkdir -p $QORTAL_FOLDER
-cd $QORTAL_FOLDER
+cd /home/$USER
 [[ -f qortal.zip ]] && rm qortal.zip
 echo "Downloading the latest Qortal.zip..."
 wget -q https://github.com/Qortal/qortal/releases/latest/download/qortal.zip
