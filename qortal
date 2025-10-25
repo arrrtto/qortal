@@ -1,7 +1,7 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.0"
+QORTAL_HELPER_VERSION="1.1"
 QORTAL_FOLDER="/home/$USER/qortal"
 
 function check() {
@@ -16,7 +16,8 @@ fi
 
 clear
 [[ -d $QORTAL_FOLDER ]] && echo "✅ $QORTAL_FOLDER folder exists."
-[[ -f $QORTAL_FOLDER/qortal.jar ]] && echo "✅ Core (qortal.jar) also exists."
+[[ -f $QORTAL_FOLDER/qortal.jar ]] && echo "✅ Core (qortal.jar) exists."
+[[ -f $QORTAL_FOLDER/apikey.txt ]] && echo "✅ apikey.txt exists."
 
 md5sumexists=$(which md5sum)
 if [[ -z $md5sumexists ]]; then
@@ -224,7 +225,7 @@ cd $QORTAL_FOLDER
 totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
 if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
 
-#QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
+QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
 
 loop="True"
 while [[ $loop == "True" ]]; do
@@ -234,7 +235,7 @@ connections=$(echo $output | jq '."numberOfConnections"')
 blockheight=$(echo $output | jq '."height"')
 minting=$(echo $output | jq '."isMintingPossible"')
 syncing=$(echo $output | jq '."isSynchronizing"')
-#balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
+balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
 if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
 echo "Restarting the Core..."
 ./stop.sh
@@ -248,12 +249,24 @@ echo "Connections:" $connections
 echo "Syncing:" $syncing
 echo "Minting:" $minting
 echo "Block height:" $blockheight
-#echo "Balance:" $balance
+echo "Balance:" $balance
 sleep 10
 fi
 done
 }
 
+
+function apikey() {
+output=$(curl -s "http://localhost:12391/admin/status" | grep -oP 'number')
+if [[ $output == "number" ]]; then  # Core is running :)
+curl -X POST http://localhost:12391/admin/apikey/generate -H 'accept: text/plain' -d ''
+echo ""
+sleep 1
+[[ -f $QORTAL_FOLDER/apikey.txt ]] && echo "✅ /home/$USER/qortal/apikey.txt now also generated :)"
+else
+echo "Cannot generate API key, because the Core is not running. Start it first: qortal start"
+fi
+}
 
 
 function show_help() {
@@ -268,6 +281,7 @@ printf "\e[32m%s qortal start\e[0m     Starts the Core.\n"
 printf "\e[32m%s qortal stop\e[0m      Stops the Core from running.\n"
 printf "\e[32m%s qortal monitor\e[0m   Continual overview of the Core. If no connections or Core not running, it gets auto-restarted.\n"
 printf "\e[32m%s qortal bootstrap\e[0m Deletes the db folder to do the bootstrap. Starts Core to download the newest blockchain data.\n"
+printf "\e[32m%s qortal apikey\e[0m    Generates a new API key and apikey.txt file into Qortal folder for you.\n"
 printf "\n\n"
 }
 
@@ -281,7 +295,5 @@ if [[ "$1" == "start" ]]; then startcore; fi
 if [[ "$1" == "stop" ]]; then stopcore; fi
 if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
 if [[ "$1" == "monitor" ]]; then qcheck; fi
-
-
-
+if [[ "$1" == "apikey" ]]; then apikey; fi
 
