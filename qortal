@@ -1,0 +1,286 @@
+#!/bin/bash
+# Made by Artto 2025
+
+QORTAL_HELPER_VERSION="1.0"
+QORTAL_FOLDER="/home/$USER/qortal"
+
+function check() {
+# Checking if qortal folder and qortal.jar exist in users's Home folder.
+# Checking if newest Core is in the computer or not.
+if [[ ! -d $QORTAL_FOLDER ]]; then
+clear
+echo "$QORTAL_FOLDER folder does not exist. This means you cannot currently run Qortal Core locally."
+echo "Do you want Qortal Core and other files be installed for you? Then type command: qortal download"
+return
+fi
+
+clear
+[[ -d $QORTAL_FOLDER ]] && echo "✅ $QORTAL_FOLDER folder exists."
+[[ -f $QORTAL_FOLDER/qortal.jar ]] && echo "✅ Core (qortal.jar) also exists."
+
+md5sumexists=$(which md5sum)
+if [[ -z $md5sumexists ]]; then
+echo ""
+echo "MD5SUM app is missing from your GNU/Linux system. This is needed for verifying Core MD5 hash sum, for security reasons."
+echo "Installing MD5SUM app next. Please enter your computer password for the installation, thanks!"
+sudo apt update -qq >/dev/null 2>&1
+sudo apt install -y coreutils >/dev/null 2>&1
+echo "Done."
+echo ""
+fi
+
+if [[ -f $QORTAL_FOLDER/qortal.jar ]]; then jar_md5_local=$(md5sum $QORTAL_FOLDER/qortal.jar | awk -F ' ' '{print $1}'); fi
+echo "Checking the Core file hash on GitHub and comparing to local one..."
+jar_md5_github=$(curl -s "https://github.com/Qortal/qortal/releases" | grep -E "MD5:" -B 2 | head -n 4 | grep -oP 'MD5:.*?<' | sed 's/<//g' | awk -F ' ' '{print $2}')
+if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github == $jar_md5_local ]]; then echo "✅ You already have the latest qortal.jar"; fi
+if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github != $jar_md5_local ]]; then echo "There is a newer/different version of the Core in GitHub. If you want to get that latest Core installed, type command: qortal update"; fi
+}
+
+
+function downloadzip() {
+unzipexists=$(which unzip)
+if [[ -z $unzipexists ]]; then
+echo "UnZip app is missing from your GNU/Linux system. Let's install it now."
+echo "Please enter your computer password for the installation, thanks!"
+sudo apt update -qq >/dev/null 2>&1
+sudo apt install -y unzip >/dev/null 2>&1
+echo "Done."
+echo ""
+fi
+
+mkdir -p $QORTAL_FOLDER
+cd $QORTAL_FOLDER
+[[ -f qortal.zip ]] && rm qortal.zip
+echo "Downloading the latest Qortal.zip..."
+wget -q https://github.com/Qortal/qortal/releases/latest/download/qortal.zip
+echo ""
+[[ -f qortal.zip ]] && unzip qortal.zip && sleep 1 && rm qortal.zip && echo "All done! To start the Core now, type command: qortal start"
+}
+
+
+
+function getnewjar() {
+cd $QORTAL_FOLDER
+echo "Stopping the current Core, IF it might be running..."
+stopcore
+sleep 1
+rm qortal.jar
+echo "Downloading qortal.jar..."
+wget -q "https://github.com/qortal/qortal/releases/latest/download/qortal.jar"
+echo ""
+echo "Done."
+echo ""
+echo "To start the Core now, type command: qortal start"
+}
+
+
+function bootstrap() {
+cd $QORTAL_FOLDER
+echo "Stopping the current Core, if it might be running..."
+stopcore
+sleep 1
+rm -rf db
+echo "DB folder deleted, bootstrapped. Starting the Core..."
+startcore
+}
+
+
+function stopcore() {
+# Copied from stop.sh script
+# Check for color support
+cd $QORTAL_FOLDER
+if [ -t 1 ]; then
+	ncolors=$( tput colors )
+	if [ -n "${ncolors}" -a "${ncolors}" -ge 8 ]; then
+		if normal="$( tput sgr0 )"; then
+			# use terminfo names
+			red="$( tput setaf 1 )"
+			green="$( tput setaf 2)"
+		else
+			# use termcap names for FreeBSD compat
+			normal="$( tput me )"
+			red="$( tput AF 1 )"
+			green="$( tput AF 2)"
+		fi
+	fi
+fi
+
+# Track the pid if we can find it
+read pid 2>/dev/null <run.pid
+is_pid_valid=$?
+
+# Swap out the API port if the --testnet (or -t) argument is specified
+api_port=12391
+if [[ "$@" = *"--testnet"* ]] || [[  "$@" = *"-t"* ]]; then
+  api_port=62391
+fi
+
+# Attempt to locate the process ID if we don't have one
+if [ -z "${pid}" ]; then
+  pid=$(ps aux | grep '[q]ortal.jar' | head -n 1 | awk '{print $2}')
+  is_pid_valid=$?
+fi
+
+# Locate the API key if it exists
+apikey=$(cat apikey.txt)
+success=0
+
+# Try and stop via the API
+if [ -n "$apikey" ]; then
+  echo "Stopping Qortal via API..."
+  if curl --url "http://localhost:${api_port}/admin/stop?apiKey=$apikey" 1>/dev/null 2>&1; then
+    success=1
+  fi
+fi
+
+# Try to kill process with SIGTERM
+if [ "$success" -ne 1 ] && [ -n "$pid" ]; then
+  echo "Stopping Qortal process $pid..."
+  if kill -15 "${pid}"; then
+    success=1
+  fi
+fi
+
+# Warn and exit if still no success
+if [ "$success" -ne 1 ]; then
+  if [ -n "$pid" ]; then
+    echo "${red}Stop command failed - not running with process id ${pid}?${normal}"
+  else
+    echo "${red}Stop command failed - not running?${normal}"
+  fi
+  exit 1
+fi
+
+if [ "$success" -eq 1 ]; then
+  echo "Qortal node should be shutting down"
+  if [ "${is_pid_valid}" -eq 0 ]; then
+    echo -n "Monitoring for Qortal node to end"
+    while s=`ps -p $pid -o stat=` && [[ "$s" && "$s" != 'Z' ]]; do
+      echo -n .
+      sleep 1
+    done
+    echo
+    echo "${green}Qortal ended gracefully${normal}"
+    rm -f run.pid
+  fi
+fi
+}
+
+
+function startcore() {
+# Copied from start.sh script
+cd $QORTAL_FOLDER
+if [ "$USER" = "root" ]; then
+	echo "Please su to non-root user before running"
+	exit
+fi
+
+MIN_JAVA_VER='11' # Validate Java is installed and the minimum version is available
+
+if command -v java > /dev/null 2>&1; then
+    # Example: openjdk version "11.0.6" 2020-01-14
+    version=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1,2)
+    if echo "${version}" "${MIN_JAVA_VER}" | awk '{ if ($2 > 0 && $1 >= $2) exit 0; else exit 1}'; then
+        echo 'Passed Java version check'
+    else
+        echo "Please upgrade your Java to version ${MIN_JAVA_VER} or greater"
+        exit 1
+    fi
+else
+  echo "Java is not available, please install Java ${MIN_JAVA_VER} or greater"
+  exit 1
+fi
+
+# No qortal.jar but we have a Maven built one?
+# Be helpful and copy across to correct location
+if [ ! -e qortal.jar -a -f target/qortal*.jar ]; then
+	echo "Copying Maven-built Qortal JAR to correct pathname"
+	cp target/qortal*.jar qortal.jar
+fi
+
+# Limits Java JVM stack size and maximum heap usage.
+# Comment out for bigger systems, e.g. non-routers
+# or when API documentation is enabled
+# Uncomment (remove '#' sign) line below if your system has less than 12GB of RAM for optimal RAM defaults
+# JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"
+
+# Although java.net.preferIPv4Stack is supposed to be false
+# by default in Java 11, on some platforms (e.g. FreeBSD 12),
+# it is overridden to be true by default. Hence we explicitly
+# set it to false to obtain desired behaviour.
+nohup nice -n 20 java \
+	-Djava.net.preferIPv4Stack=false \
+	${JVM_MEMORY_ARGS} \
+	-jar qortal.jar \
+	1>run.log 2>&1 &
+
+# Save backgrounded process's PID
+echo $! > run.pid
+echo "Qortal Core running as pid $!"
+}
+
+
+function qcheck() {
+cd $QORTAL_FOLDER
+totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
+if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
+
+#QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
+
+loop="True"
+while [[ $loop == "True" ]]; do
+clear
+output=$(curl -s "http://localhost:12391/admin/status")
+connections=$(echo $output | jq '."numberOfConnections"')
+blockheight=$(echo $output | jq '."height"')
+minting=$(echo $output | jq '."isMintingPossible"')
+syncing=$(echo $output | jq '."isSynchronizing"')
+#balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
+if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
+echo "Restarting the Core..."
+./stop.sh
+sleep 5
+java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar&
+echo "Started up. Waiting for 420 seconds to make sure Core is running OK."
+sleep 420
+else
+clear
+echo "Connections:" $connections
+echo "Syncing:" $syncing
+echo "Minting:" $minting
+echo "Block height:" $blockheight
+#echo "Balance:" $balance
+sleep 10
+fi
+done
+}
+
+
+
+function show_help() {
+clear
+echo "Qortal Helper script by Artto. Here is how to use it:"
+printf "\n"
+printf "\e[32m%s qortal help\e[0m      Shows this help message\n"
+printf "\e[32m%s qortal check\e[0m     Checks if Qortal Core and the needed files exist in your computer.\n"
+printf "\e[32m%s qortal download\e[0m  Downloads Qortal Core and the needed files for you.\n"
+printf "\e[32m%s qortal update\e[0m    Downloads the newest Core (qortal.jar) from GitHub for you.\n"
+printf "\e[32m%s qortal monitor\e[0m   Continual overview of the Core. If no connections or Core not running, it gets auto-restarted.\n"
+printf "\e[32m%s qortal bootstrap\e[0m Deletes the db folder to do the bootstrap. Starts Core to download the newest blockchain data.\n"
+printf "\n\n"
+}
+
+
+# ------------ PARAMETERS TO RUN THE LIBRARY FILE WITH ------------
+if [[ "$1" == "help" ]] || [[ "$1" == "" ]]; then show_help; fi
+if [[ "$1" == "check" ]]; then check; fi
+if [[ "$1" == "download" ]]; then downloadzip; fi
+if [[ "$1" == "update" ]]; then getnewjar; fi
+if [[ "$1" == "start" ]]; then startcore; fi
+if [[ "$1" == "stop" ]]; then stopcore; fi
+if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
+if [[ "$1" == "monitor" ]]; then qcheck; fi
+
+
+
+
