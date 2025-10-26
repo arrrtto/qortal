@@ -346,7 +346,7 @@ function updatescript() {
 GHVERSION=$(curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal | grep -E "QORTAL_HELPER_VERSION" | awk -F '"' '{print $2}' | head -n 1)
 if [[ $GHVERSION != $QORTAL_HELPER_VERSION ]]; then
 mkdir -p ~/bin && curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal > ~/bin/qortalnew
-if [[ $QADDR != "" ]]; then sed -i "s/^QADDR=\".*\"/QADDR=\"$QADDR\"/" qortalnew; fi
+if [[ $QADDR != "" ]]; then sed -i "s/^QADDR=\".*\"/QADDR=\"$QADDR\"/" ~/bin/qortalnew; fi
 rm ~/bin/qortal && mv ~/bin/qortalnew ~/bin/qortal && chmod +x ~/bin/qortal && echo "Qortal Helper script updated successfully to version $GHVERSION"
 else
 echo "You already have the latest version of this qortal helper script."
