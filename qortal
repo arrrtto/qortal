@@ -386,4 +386,3 @@ if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
 if [[ "$1" == "monitor" ]]; then qcheck; fi
 if [[ "$1" == "apikey" ]]; then apikey; fi
 if [[ "$1" == "killjava" ]]; then stop_all_java; fi
-
