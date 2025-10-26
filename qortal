@@ -1,7 +1,7 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.1"
+QORTAL_HELPER_VERSION="1.2"
 QORTAL_FOLDER="/home/$USER/qortal"
 
 function check() {
@@ -208,11 +208,11 @@ fi
 # by default in Java 11, on some platforms (e.g. FreeBSD 12),
 # it is overridden to be true by default. Hence we explicitly
 # set it to false to obtain desired behaviour.
-nohup nice -n 20 java \
-	-Djava.net.preferIPv4Stack=false \
-	${JVM_MEMORY_ARGS} \
-	-jar qortal.jar \
-	1>run.log 2>&1 &
+
+totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
+if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
+
+nohup nice -n 20 java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar 1>run.log 2>&1 &
 
 # Save backgrounded process's PID
 echo $! > run.pid
@@ -222,9 +222,6 @@ echo "Qortal Core running as pid $!"
 
 function qcheck() {
 cd $QORTAL_FOLDER
-totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
-if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
-
 #QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
 
 loop="True"
@@ -237,12 +234,10 @@ minting=$(echo $output | jq '."isMintingPossible"')
 syncing=$(echo $output | jq '."isSynchronizing"')
 #balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
 if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
-echo "Restarting the Core..."
-./stop.sh
-sleep 5
-java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar&
-echo "Started up. Waiting for 420 seconds to make sure Core is running OK."
-sleep 420
+pgrep -af "java.*-jar qortal.jar" >/dev/null && echo "Restarting the Core..." && stopcore && sleep 5 && startcore
+pgrep -af "java.*-jar qortal.jar" >/dev/null || echo "Core not running, starting it..." && startcore
+echo "Started up. Waiting for 500 seconds to make sure Core is running OK, before monitoring starts."
+sleep 500
 else
 clear
 echo "Connections:" $connections
@@ -250,7 +245,7 @@ echo "Syncing:" $syncing
 echo "Minting:" $minting
 echo "Block height:" $blockheight
 #echo "Balance:" $balance
-sleep 10
+sleep 30
 fi
 done
 }
