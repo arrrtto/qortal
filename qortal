@@ -1,7 +1,7 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.5"
+QORTAL_HELPER_VERSION="1.5"   # VERSIONNUMBER
 QORTAL_FOLDER="/home/$USER/qortal"
 QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"  # Change that address to your own
 
@@ -338,7 +338,7 @@ fi
 
 
 function updatescript() {
-GHVERSION=$(curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal | grep -E "QORTAL_HELPER_VERSION" | awk -F '"' '{print $2}')
+GHVERSION=$(curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal | grep -E "VERSIONNUMBER" | awk -F '"' '{print $2}')
 if [[ $GHVERSION != $QORTAL_HELPER_VERSION ]]; then
 mkdir -p ~/bin && curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal > ~/bin/qortalnew
 rm ~/bin/qortal && mv ~/bin/qortalnew ~/bin/qortal && chmod +x ~/bin/qortal && echo "Qortal Helper script updated successfully to version $GHVERSION"
@@ -378,5 +378,4 @@ if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
 if [[ "$1" == "monitor" ]]; then qcheck; fi
 if [[ "$1" == "apikey" ]]; then apikey; fi
 if [[ "$1" == "killjava" ]]; then stop_all_java; fi
-
 
