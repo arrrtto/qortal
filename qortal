@@ -1,20 +1,19 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.3"
+QORTAL_HELPER_VERSION="1.4"
 QORTAL_FOLDER="/home/$USER/qortal"
+QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"  # Change that address to your own
+
 
 function check() {
 # Checking if qortal folder and qortal.jar exist in users's Home folder.
 # Checking if newest Core is in the computer or not.
 if [[ ! -d $QORTAL_FOLDER ]]; then
-clear
 echo "$QORTAL_FOLDER folder does not exist. This means you cannot currently run Qortal Core locally."
 echo "Do you want Qortal Core and other files be installed for you? Then type command: qortal download"
 return
 fi
-
-clear
 [[ -d $QORTAL_FOLDER ]] && echo "✅ $QORTAL_FOLDER folder exists."
 [[ -f $QORTAL_FOLDER/qortal.jar ]] && echo "✅ Core (qortal.jar) exists."
 [[ -f $QORTAL_FOLDER/apikey.txt ]] && echo "✅ apikey.txt exists."
@@ -33,8 +32,25 @@ fi
 if [[ -f $QORTAL_FOLDER/qortal.jar ]]; then jar_md5_local=$(md5sum $QORTAL_FOLDER/qortal.jar | awk -F ' ' '{print $1}'); fi
 echo "Checking the Core file hash on GitHub and comparing to local one..."
 jar_md5_github=$(curl -s "https://github.com/Qortal/qortal/releases" | grep -E "MD5:" -B 2 | head -n 4 | grep -oP 'MD5:.*?<' | sed 's/<//g' | awk -F ' ' '{print $2}')
-if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github == $jar_md5_local ]]; then echo "✅ You already have the latest qortal.jar"; fi
+if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github == $jar_md5_local ]]; then echo "✅ You have the latest qortal.jar"; fi
 if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github != $jar_md5_local ]]; then echo "There is a newer/different version of the Core in GitHub. If you want to get that latest Core installed, type command: qortal update"; fi
+
+output=$(curl -s "http://localhost:12391/admin/status")
+connections=$(echo $output | jq '."numberOfConnections"')
+blockheight=$(echo $output | jq '."height"')
+minting=$(echo $output | jq '."isMintingPossible"')
+syncing=$(echo $output | jq '."isSynchronizing"')
+balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
+if [[ -z $connections ]]; then
+count=$(pgrep -af "java.*-jar qortal.jar" | wc -l)
+pgrep -af "java.*-jar qortal.jar" >/dev/null || echo "Core is not running."
+else
+echo "Connections:" $connections
+echo "Syncing:" $syncing
+echo "Minting:" $minting
+echo "Block height:" $blockheight
+if [[ -n $balance ]]; then echo "Balance:" $balance; fi
+fi
 }
 
 
@@ -267,8 +283,6 @@ function stop_all_java() {
 
 function qcheck() {
 cd $QORTAL_FOLDER
-#QADDR="QPVth1AArSPv3V4FYvusrNWTAcMaBKX7Kw"
-
 loop="True"
 while [[ $loop == "True" ]]; do
 clear
@@ -277,7 +291,7 @@ connections=$(echo $output | jq '."numberOfConnections"')
 blockheight=$(echo $output | jq '."height"')
 minting=$(echo $output | jq '."isMintingPossible"')
 syncing=$(echo $output | jq '."isSynchronizing"')
-#balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
+balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
 if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
 count=$(pgrep -af "java.*-jar qortal.jar" | wc -l)
 case $count in
@@ -303,7 +317,7 @@ echo "Connections:" $connections
 echo "Syncing:" $syncing
 echo "Minting:" $minting
 echo "Block height:" $blockheight
-#echo "Balance:" $balance
+if [[ -n $balance ]]; then echo "Balance:" $balance; fi
 sleep 30
 fi
 done
@@ -352,3 +366,5 @@ if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
 if [[ "$1" == "monitor" ]]; then qcheck; fi
 if [[ "$1" == "apikey" ]]; then apikey; fi
 if [[ "$1" == "killjava" ]]; then stop_all_java; fi
+
+
