@@ -77,7 +77,15 @@ echo "To start the Core now, type command: qortal start"
 function bootstrap() {
 cd $QORTAL_FOLDER
 echo "Stopping the current Core, if it might be running..."
-stopcore
+count=$(pgrep -af "java.*-jar qortal.jar" | wc -l)
+if (( count >= 2 )); then
+  echo "2 or more instances running"
+  stopcore
+  stopcore
+else
+  echo "Less than 2 instances running"
+  stopcore
+fi
 sleep 1
 rm -rf db
 echo "DB folder deleted, bootstrapped. Starting the Core..."
@@ -212,12 +220,49 @@ fi
 totalram=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
 if [[ $totalram -lt 15000000 ]]; then JVM_MEMORY_ARGS="-Xss1256k -Xmx3128m"; fi # If the computer has less than 16GB RAM then use the JVM_MEMORY_ARGS setting for the Core
 
-nohup nice -n 20 java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar 1>run.log 2>&1 &
-
-# Save backgrounded process's PID
-echo $! > run.pid
-echo "Qortal Core running as pid $!"
+count=$(pgrep -af "java.*-jar qortal.jar" | wc -l)
+case $count in
+  0)
+    nohup nice -n 20 java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar 1>run.log 2>&1 &  # No instances running, starting :)
+    # Save backgrounded process's PID
+    echo $! > run.pid
+    echo "Qortal Core running as pid $!"
+    ;;
+  1)
+    echo "One instance of the Core is already running"
+    ;;
+  *)
+    echo "$count (multiple) instances of the Core are running! Better stop them and start the Core again. Doing it now"
+    stop_all_java
+    sleep 2
+    nohup nice -n 20 java -Djava.net.preferIPv4Stack=false ${JVM_MEMORY_ARGS} -jar qortal.jar 1>run.log 2>&1 &  # No instances running, starting :)
+    echo $! > run.pid
+    echo "Qortal Core running now as pid $!"
+    ;;
+esac
 }
+
+
+function stop_all_java() {
+  echo "Attempting graceful shutdown of all Java processes..."
+  sudo killall -15 java 2>/dev/null
+  local elapsed=0
+  local interval=3
+  local timeout=60
+  while pgrep -x java >/dev/null && (( elapsed < timeout )); do
+    echo "Java still running... waiting (${elapsed}s/${timeout}s)"
+    sleep $interval
+    ((elapsed+=interval))
+  done
+
+  if pgrep -x java >/dev/null; then
+    echo "Graceful shutdown failed after ${timeout}s — forcing kill..."
+    sudo killall -9 java 2>/dev/null
+  else
+    echo "All Java processes stopped gracefully. You can now start the Core again, if you want."
+  fi
+}
+
 
 
 function qcheck() {
@@ -234,7 +279,21 @@ minting=$(echo $output | jq '."isMintingPossible"')
 syncing=$(echo $output | jq '."isSynchronizing"')
 #balance=$(curl -sX 'GET' "http://localhost:12391/addresses/balance/$QADDR" -H 'accept: text/plain')
 if [[ $connections == "0" ]] || [[ $connections == "" ]]; then
-pgrep -af "java.*-jar qortal.jar" >/dev/null && echo "Restarting the Core..." && stopcore && sleep 5 && startcore
+count=$(pgrep -af "java.*-jar qortal.jar" | wc -l)
+case $count in
+  1)
+    # If one instance of the Core is running, stop it and start a new instance
+    pgrep -af "java.*-jar qortal.jar" >/dev/null && echo "Restarting the Core..."
+    stopcore
+    sleep 5
+    startcore
+    ;;
+  2)
+    # If more than one instances running, stop them all first
+    stop_all_java
+    sleep 2
+    ;;
+esac
 pgrep -af "java.*-jar qortal.jar" >/dev/null || echo "Core not running, starting it..." && startcore
 echo "Started up. Waiting for 500 seconds to make sure Core is running OK, before monitoring starts."
 sleep 500
@@ -277,6 +336,7 @@ printf "\e[32m%s qortal stop\e[0m      Stops the Core from running.\n"
 printf "\e[32m%s qortal monitor\e[0m   Continual overview of the Core. If no connections or Core not running, it gets auto-restarted.\n"
 printf "\e[32m%s qortal bootstrap\e[0m Deletes the db folder to do the bootstrap. Starts Core to download the newest blockchain data.\n"
 printf "\e[32m%s qortal apikey\e[0m    Generates a new API key and apikey.txt file into Qortal folder for you.\n"
+printf "\e[32m%s qortal killjava\e[0m  Stops all the Java processes to stop the Core instance(s) forcefully.\n"
 printf "\n\n"
 }
 
@@ -291,4 +351,4 @@ if [[ "$1" == "stop" ]]; then stopcore; fi
 if [[ "$1" == "bootstrap" ]]; then bootstrap; fi
 if [[ "$1" == "monitor" ]]; then qcheck; fi
 if [[ "$1" == "apikey" ]]; then apikey; fi
-
+if [[ "$1" == "killjava" ]]; then stop_all_java; fi
