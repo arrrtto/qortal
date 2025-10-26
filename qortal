@@ -1,7 +1,7 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.2"
+QORTAL_HELPER_VERSION="1.3"
 QORTAL_FOLDER="/home/$USER/qortal"
 
 function check() {
