@@ -1,7 +1,7 @@
 #!/bin/bash
 # Made by Artto 2025
 
-QORTAL_HELPER_VERSION="1.6"
+QORTAL_HELPER_VERSION="1.7"
 QORTAL_FOLDER="/home/$USER/qortal"
 QADDR=""  # Put your own Qortal address here between the quotes, for balance detection.
 
@@ -36,7 +36,7 @@ if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github
 if [[ ! -z $jar_md5_github ]] && [[ ! -z $jar_md5_local ]] && [[ $jar_md5_github != $jar_md5_local ]]; then echo "There is a newer/different version of the Core in GitHub. If you want to get that latest Core installed, type command: qortal update"; fi
 
 # Check for a newer version of this script
-GHVERSION=$(curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal | grep -E "QORTAL_HELPER_VERSION" | awk -F '"' '{print $2}')
+GHVERSION=$(curl -s https://raw.githubusercontent.com/arrrtto/qortal/main/qortal | grep -E "QORTAL_HELPER_VERSION" | awk -F '"' '{print $2}' | head -n 1)
 if [[ $GHVERSION != $QORTAL_HELPER_VERSION ]]; then echo "There is a newer version of Qortal Helper script in GitHub: $GHVERSION"; fi
 
 output=$(curl -s "http://localhost:12391/admin/status")
